@@ -1,27 +1,30 @@
 // 状态枚举
 const STATES = {
   NORMAL: "常规模式", // 最顶级状态
-  ENTRANCE: "返回入口", // 返回到currentBusiness对应的模式
+  ENTRANCE: "返回", // 返回到currentBusiness对应的模式
   SERVER: "服务器模式",
   SERVER_ENTER_DEVICE: "服务器模式_进入设备",
   SERVER_ENTER_DEVICE_SPLIT: "服务器模式_进入设备_分屏模式",
   SERVER_ENTER_DEVICE_SINGLE: "服务器模式_进入设备_单屏模式",
-  NETWORK_ARCHITECTURE: "网络架构",
+  NETWORK_ARCHITECTURE: "网络监控",
+  NETWORK_ARCHITECTURE_ENTER_DEVICE: "网络架构_进入设备",
   CPU_MODEL: "CPU模式",
-  ROOM_MODEL:'物理空间模式'
+  NORMAL_MODEL: ["物理空间模式", '机柜模式',"温度监控", "能耗监控"],
 };
 
 // 状态转换标志枚举
 const TRANSITION_FLAGS = {
   NORMAL: "常规模式", // 新增
-  ENTRANCE: "返回入口",
+  ENTRANCE: "返回",
   SERVER: "服务器模式",
   SERVER_ENTER_DEVICE: "服务器模式_进入设备",
   SPLIT_SCREEN: "分屏模式",
   SINGLE_SCREEN: "单屏模式",
-  NETWORK_ARCHITECTURE: "网络架构模式",
+  NETWORK_ARCHITECTURE: "网络监控",
+  NETWORK_ARCHITECTURE_ENTER_DEVICE: "网络架构_进入设备",
   CPU_MODEL: "CPU模式",
-  ROOM_MODEL:'物理空间模式'
+  NORMAL_MODEL: ["物理空间模式", '机柜模式',"温度监控", "能耗监控"],
+
 };
 
 const instanceSymbol = Symbol("StateMachine");
@@ -172,6 +175,18 @@ class StateMachine {
     }
 
     const oldState = this.currentState;
+    const currentStateObj = this.allStates[this.currentState];
+    
+    // 如果当前状态有deaction，先执行deaction
+    if (currentStateObj && currentStateObj.deaction) {
+      console.error(`执行状态 ${oldState} 的 deaction`);
+      try {
+        currentStateObj.deaction();
+      } catch (error) {
+        console.error(`执行 ${oldState} 的 deaction 时出错:`, error);
+      }
+    }
+
     this.currentState = newState;
 
     console.error(`状态转换: ${oldState} -> ${newState}`);
@@ -214,7 +229,6 @@ class StateMachine {
           this.normalMode();
           THINGX.SplitScreenTwoTools.pauseBusinessEvent();
           this.currentBusiness = null;
-          // this.initNormalMode();
         },
         trans: {
           [STATES.SERVER]: this.checkBusiness(TRANSITION_FLAGS.SERVER),
@@ -225,52 +239,26 @@ class StateMachine {
         },
       },
 
-      // 返回入口 - 返回到currentBusiness对应的模式
-      [STATES.ENTRANCE]: {
-        action: () => {
-          if (this.currentBusiness) {
-            console.error(`返回到业务模式: ${this.currentBusiness}`);
-            this.returnEntry(this.currentBusiness);
-            // 根据currentBusiness返回到对应模式
-            window.uinv.nextStates_flag = this.currentBusiness;
-          }
-        },
-        trans: {
-          [STATES.NORMAL]: this.createTransitionChecker(
-            TRANSITION_FLAGS.NORMAL
-          ),
-          [STATES.SERVER]: this.createTransitionChecker(
-            TRANSITION_FLAGS.SERVER
-          ),
-          [STATES.NETWORK_ARCHITECTURE]: this.createTransitionChecker(
-            TRANSITION_FLAGS.NETWORK_ARCHITECTURE
-          ),
-          [STATES.NETWORK_ARCHITECTURE]: this.createTransitionChecker(
-            TRANSITION_FLAGS.NETWORK_ARCHITECTURE
-          ),
-          
-        },
-      },
-
       // 服务器模式 - 监听返回入口、常规模式、服务器进入设备
       [STATES.SERVER]: {
         action: () => {
           console.error("服务器模式action");
           // 设置当前业务模式
+          if(THINGX.Business.getActivatedName() !== TRANSITION_FLAGS.SERVER){
+             THINGX.Business.activate(TRANSITION_FLAGS.SERVER)
+          }
           this.normalMode();
           this.serverMode();
         },
         trans: {
-          [STATES.ENTRANCE]: this.createTransitionChecker(
-            TRANSITION_FLAGS.ENTRANCE
+          [STATES.CPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.CPU_MODEL),
+          [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(
+            TRANSITION_FLAGS.NETWORK_ARCHITECTURE
           ),
-          [STATES.NORMAL]: this.checkBusiness(
-            TRANSITION_FLAGS.ROOM_MODEL
-          ),
+          [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
           [STATES.SERVER_ENTER_DEVICE]: this.createTransitionChecker(
             TRANSITION_FLAGS.SERVER_ENTER_DEVICE
           ),
-          [STATES.CPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.CPU_MODEL),
         },
       },
 
@@ -288,7 +276,7 @@ class StateMachine {
           [STATES.SERVER_ENTER_DEVICE_SINGLE]: this.createTransitionChecker(
             TRANSITION_FLAGS.SINGLE_SCREEN
           ),
-          [STATES.ENTRANCE]: this.createTransitionChecker(
+          [STATES.SERVER]: this.createTransitionChecker(
             TRANSITION_FLAGS.ENTRANCE
           ),
         },
@@ -304,7 +292,7 @@ class StateMachine {
           [STATES.SERVER_ENTER_DEVICE_SPLIT]: this.createTransitionChecker(
             TRANSITION_FLAGS.SPLIT_SCREEN
           ),
-          [STATES.ENTRANCE]: this.createTransitionChecker(
+          [STATES.SERVER]: this.createTransitionChecker(
             TRANSITION_FLAGS.ENTRANCE
           ),
         },
@@ -315,13 +303,14 @@ class StateMachine {
         action: () => {
           console.error("服务器分屏action");
           this.serverModeClickSplitScreen();
+          
         },
         trans: {
           [STATES.SERVER_ENTER_DEVICE_SINGLE]: this.createTransitionChecker(
             TRANSITION_FLAGS.SINGLE_SCREEN
           ),
-          [STATES.ENTRANCE]: this.createTransitionChecker(
-            TRANSITION_FLAGS.ENTRANCE
+          [STATES.SERVER]: this.createTransitionChecker(
+           TRANSITION_FLAGS.ENTRANCE
           ),
         },
       },
@@ -331,13 +320,10 @@ class StateMachine {
           console.error("执行CPU模式action");
           this.normalMode();
           this.cpuMode();
-          // 设置当前业务模式
-          this.currentBusiness = TRANSITION_FLAGS.CPU_MODEL;
+         
         },
         trans: {
-          [STATES.NORMAL]: this.createTransitionChecker(
-            TRANSITION_FLAGS.NORMAL
-          ),
+          [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
           [STATES.SERVER]: this.checkBusiness(TRANSITION_FLAGS.SERVER),
           [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(
             TRANSITION_FLAGS.NETWORK_ARCHITECTURE
@@ -349,21 +335,71 @@ class StateMachine {
       [STATES.NETWORK_ARCHITECTURE]: {
         action: () => {
           console.error("执行网络架构action");
-          // 设置当前业务模式
-          this.currentBusiness = TRANSITION_FLAGS.NETWORK_ARCHITECTURE;
+          if(THINGX.Business.getActivatedName() !== TRANSITION_FLAGS.NETWORK_ARCHITECTURE){
+             THINGX.Business.activate(TRANSITION_FLAGS.NETWORK_ARCHITECTURE)
+          }
+          if(this.currentBusiness === TRANSITION_FLAGS.NETWORK_ARCHITECTURE){
+             THINGX.SplitScreenTwoTools.show();
+          }
+          this.normalMode()
+          this.networkArchitecture()
         },
         trans: {
-          [STATES.ENTRANCE]: this.createTransitionChecker(
-            TRANSITION_FLAGS.ENTRANCE
-          ),
-          [STATES.NORMAL]: this.createTransitionChecker(
-            TRANSITION_FLAGS.NORMAL
-          ),
+          [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
+          [STATES.SERVER]: this.checkBusiness(TRANSITION_FLAGS.SERVER),
+          [STATES.CPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.CPU_MODEL),
+          [STATES.NETWORK_ARCHITECTURE_ENTER_DEVICE]: this.createTransitionChecker(TRANSITION_FLAGS.NETWORK_ARCHITECTURE_ENTER_DEVICE),
         },
+
+     
+
       },
+         [STATES.NETWORK_ARCHITECTURE_ENTER_DEVICE]: {
+          action: () => {
+            console.error("网络架构_进入设备action");
+            this.normalMode()
+            this.networkArchitectureEnterDevice()
+          },
+          trans: {
+            [STATES.NETWORK_ARCHITECTURE]: this.createTransitionChecker(TRANSITION_FLAGS.ENTRANCE),
+            [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
+          }
+
+        }
     };
   }
 
+  /**
+   * @description 监测是否是常规模式
+   * @param {*} expectedFlag
+   * @returns
+   */
+  checkNormalMode(expectedFlag) {
+    return () => {
+      const currentFlag = THINGX.Business.getActivatedName();
+      const flag = expectedFlag.includes(currentFlag);
+
+      // 添加调试信息
+      if (currentFlag) {
+        // console.error(
+        //   `检查转换条件: 当前状态=${this.currentState}, 期望标志=${expectedFlag}, 实际标志=${currentFlag}, 匹配=${flag}`
+        // );
+      }
+
+      if (flag) {
+        console.error(`状态转换条件满足: ${this.currentState} -> 目标状态`);
+        return true;
+      }
+
+      return false;
+    };
+  }
+
+  /**
+   * @description 业务检测
+   * @param {*} expectedFlag
+   * @returns
+   */
   checkBusiness(expectedFlag) {
     return () => {
       const currentFlag = THINGX.Business.getActivatedName();
@@ -371,9 +407,9 @@ class StateMachine {
 
       // 添加调试信息
       if (currentFlag) {
-        console.error(
-          `检查转换条件: 当前状态=${this.currentState}, 期望标志=${expectedFlag}, 实际标志=${currentFlag}, 匹配=${flag}`
-        );
+        // console.error(
+        //   `检查转换条件: 当前状态=${this.currentState}, 期望标志=${expectedFlag}, 实际标志=${currentFlag}, 匹配=${flag}`
+        // );
       }
 
       if (flag) {
@@ -397,9 +433,9 @@ class StateMachine {
 
       // 添加调试信息
       if (currentFlag) {
-        console.error(
-          `检查转换条件: 当前状态=${this.currentState}, 期望标志=${expectedFlag}, 实际标志=${currentFlag}, 匹配=${flag}`
-        );
+        // console.error(
+        //   `检查转换条件: 当前状态=${this.currentState}, 期望标志=${expectedFlag}, 实际标志=${currentFlag}, 匹配=${flag}`
+        // );
       }
 
       if (flag) {
@@ -417,20 +453,19 @@ class StateMachine {
    * @description 返回入口时的操作
    * @param {string} business 业务值
    */
-  returnEntry(business) {
-    if (business === TRANSITION_FLAGS.SERVER) {
-      THINGX.SplitScreenTwoTools.THINGX.Layer.activate("iframeserver");
-      THINGX.SplitScreenTools.hide();
-      THINGX.SplitScreenTwoTools.show();
-      window.uinv.nextStates_flag = TRANSITION_FLAGS.SERVER;
-    }
+  returnEntry() {
+      this.normalMode()
+      if(this.currentBusiness === TRANSITION_FLAGS.SERVER){
+        window.uinv.nextStates_flag = TRANSITION_FLAGS.SERVER;
+      }
+
+      
   }
   /**
    * @description 常规模式执行方法
    */
   normalMode() {
-    // THINGX.SplitScreenTwoTools.THINGX.Layer.deactivate("iframeserver");
-    // THINGX.SplitScreenTwoTools.THINGX.Layer.deactivate("iframecpu");
+    THINGX.SplitScreenTools.hide();
     THINGX.SplitScreenTwoTools.hide();
   }
 
@@ -445,11 +480,9 @@ class StateMachine {
 
     THINGX.SplitScreenTwoTools.postMessageToIframe({
       type: "runScript",
-      data: `
-                            THINGX.Business.activate('${TRANSITION_FLAGS.SERVER}');
-
-                        `,
+      data: `THINGX.Business.activate('${TRANSITION_FLAGS.SERVER}');`,
     });
+    THINGX.SplitScreenTools.hide();
     THINGX.SplitScreenTwoTools.show();
     this.currentBusiness = TRANSITION_FLAGS.SERVER;
   }
@@ -462,10 +495,33 @@ class StateMachine {
       type: "setAttributes",
       data: ["LevelCurrent", THING.App.current.level.current.userData],
     });
-    THINGX.SplitScreenTwoTools.THINGX.Layer.activate("iframecpu");
+    THINGX.SplitScreenTwoTools.postMessageToIframe({
+      type: "runScript",
+      data: `THINGX.Business.activate('${TRANSITION_FLAGS.CPU_MODEL}');`,
+    });
     THINGX.SplitScreenTwoTools.show();
     this.currentBusiness = TRANSITION_FLAGS.CPU_MODEL;
   }
+  /**
+   * @description 网络架构
+   */
+  networkArchitecture() {
+     THINGX.SplitScreenTwoTools.postMessageToIframe({
+      type: "runScript",
+      data: `THINGX.Business.activate('${TRANSITION_FLAGS.NETWORK_ARCHITECTURE}');`,
+    });
+    THINGX.SplitScreenTwoTools.show();
+    this.currentBusiness = TRANSITION_FLAGS.NETWORK_ARCHITECTURE;
+  }
+
+
+  /**
+   * @description 创建定位盒子
+   */
+  createLocationBox(serverCi) {
+   window.serverBoxManager.createServerBox(serverCi);
+  }
+
 
   /**
    * @description 服务器模式下，点击设备时的操作
@@ -474,15 +530,21 @@ class StateMachine {
     THINGX.SplitScreenTools.updateServerCi({
       _DBID_: uinv["选择服务器模式下的设备"]._DBID_,
     });
+    THINGX.SplitScreenTwoTools.hide();
     THINGX.SplitScreenTools.show();
   }
+
+  networkArchitectureEnterDevice() {
+   window.localtionFunc.click(uinv["选择网络监控下的设备"]);
+  }
+
   /**
    * @description 服务器模式下，点击分屏时的操作
    */
   serverModeClickSplitScreen() {
     THINGX.SplitScreenTools.changeShowType("half");
     THINGX.SplitScreenTwoTools.hide();
-    window.localtionFunc.click(uinv["选择服务器模式下的设备"]);
+    this.createLocationBox(uinv["选择服务器模式下的设备"]);
   }
 
   /**
@@ -490,6 +552,7 @@ class StateMachine {
    */
   serverModeClickFullScreen() {
     THINGX.SplitScreenTools.changeShowType("full");
+    window.serverBoxManager.destroy();
   }
 }
 
