@@ -8,8 +8,14 @@ const STATES = {
   SERVER_ENTER_DEVICE_SINGLE: "服务器模式_进入设备_单屏模式",
   NETWORK_ARCHITECTURE: "网络监控",
   NETWORK_ARCHITECTURE_ENTER_DEVICE: "网络架构_进入设备",
-  CPU_MODEL: "CPU模式",
-  NORMAL_MODEL: ["物理空间模式", '机柜模式',"温度监控", "能耗监控"],
+  GPU_MODEL: "GPU模式",
+  ENERGY_CONSUMPTION: "能耗监控",
+  ENERGY_CONSUMPTION_ENTER_DEVICE: "能耗进入设备",
+  TEMPERATURE: "温度监控",
+  TEMPERATURE_ENTER_DEVICE: "温度云图进入设备",
+  TEMPERATURE_ENTER_DEVICE_SPLIT: "温度云图进入分屏",
+  TEMPERATURE_ENTER_DEVICE_SINGLE: "温度云图进入单屏",
+  NORMAL_MODEL: ["物理空间模式", '机柜模式','业务架构'],
 };
 
 // 状态转换标志枚举
@@ -22,8 +28,15 @@ const TRANSITION_FLAGS = {
   SINGLE_SCREEN: "单屏模式",
   NETWORK_ARCHITECTURE: "网络监控",
   NETWORK_ARCHITECTURE_ENTER_DEVICE: "网络架构_进入设备",
-  CPU_MODEL: "CPU模式",
-  NORMAL_MODEL: ["物理空间模式", '机柜模式',"温度监控", "能耗监控"],
+  GPU_MODEL: "GPU模式",
+  ENERGY_CONSUMPTION: "能耗监控",
+  ENERGY_CONSUMPTION_ENTER_DEVICE: "能耗进入设备",
+  TEMPERATURE: "温度监控",
+  TEMPERATURE_ENTER_DEVICE: "温度云图进入设备",
+
+
+  NORMAL_MODEL: ["物理空间模式", '机柜模式','业务架构'],
+
 
 };
 
@@ -235,7 +248,9 @@ class StateMachine {
           [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(
             TRANSITION_FLAGS.NETWORK_ARCHITECTURE
           ),
-          [STATES.CPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.CPU_MODEL),
+          [STATES.GPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.GPU_MODEL),
+          [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(TRANSITION_FLAGS.ENERGY_CONSUMPTION),
+
         },
       },
 
@@ -251,11 +266,15 @@ class StateMachine {
           this.serverMode();
         },
         trans: {
-          [STATES.CPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.CPU_MODEL),
+          [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
+
+          [STATES.GPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.GPU_MODEL),
           [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(
             TRANSITION_FLAGS.NETWORK_ARCHITECTURE
           ),
-          [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
+          [STATES.TEMPERATURE]: this.checkBusiness(TRANSITION_FLAGS.TEMPERATURE),
+          [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(TRANSITION_FLAGS.ENERGY_CONSUMPTION),
+
           [STATES.SERVER_ENTER_DEVICE]: this.createTransitionChecker(
             TRANSITION_FLAGS.SERVER_ENTER_DEVICE
           ),
@@ -314,20 +333,24 @@ class StateMachine {
           ),
         },
       },
-      // CPU模式
-      [STATES.CPU_MODEL]: {
+      // GPU模式
+      [STATES.GPU_MODEL]: {
         action: () => {
-          console.error("执行CPU模式action");
+          console.error("执行GPU模式action");
           this.normalMode();
           this.cpuMode();
          
         },
         trans: {
           [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
+
           [STATES.SERVER]: this.checkBusiness(TRANSITION_FLAGS.SERVER),
           [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(
             TRANSITION_FLAGS.NETWORK_ARCHITECTURE
           ),
+          [STATES.TEMPERATURE]: this.checkBusiness(TRANSITION_FLAGS.TEMPERATURE),
+          [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(TRANSITION_FLAGS.ENERGY_CONSUMPTION),
+
         },
       },
 
@@ -340,14 +363,19 @@ class StateMachine {
           }
           if(this.currentBusiness === TRANSITION_FLAGS.NETWORK_ARCHITECTURE){
              THINGX.SplitScreenTwoTools.show();
+             return
           }
           this.normalMode()
           this.networkArchitecture()
         },
         trans: {
           [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
+
           [STATES.SERVER]: this.checkBusiness(TRANSITION_FLAGS.SERVER),
-          [STATES.CPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.CPU_MODEL),
+          [STATES.GPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.GPU_MODEL),
+          [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(TRANSITION_FLAGS.ENERGY_CONSUMPTION),
+          [STATES.TEMPERATURE]: this.checkBusiness(TRANSITION_FLAGS.TEMPERATURE),
+
           [STATES.NETWORK_ARCHITECTURE_ENTER_DEVICE]: this.createTransitionChecker(TRANSITION_FLAGS.NETWORK_ARCHITECTURE_ENTER_DEVICE),
         },
 
@@ -365,7 +393,94 @@ class StateMachine {
             [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
           }
 
-        }
+        },
+        [STATES.ENERGY_CONSUMPTION]: {
+          action: () => {
+            console.error("能耗监控action");
+            this.normalMode()
+            this.currentBusiness = TRANSITION_FLAGS.ENERGY_CONSUMPTION
+
+          },
+          trans: {
+            [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
+
+            [STATES.SERVER]: this.checkBusiness(TRANSITION_FLAGS.SERVER),
+            [STATES.GPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.GPU_MODEL),
+            [STATES.TEMPERATURE]: this.checkBusiness(TRANSITION_FLAGS.TEMPERATURE),
+            [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(TRANSITION_FLAGS.NETWORK_ARCHITECTURE),
+
+            [STATES.ENERGY_CONSUMPTION_ENTER_DEVICE]: this.createTransitionChecker(TRANSITION_FLAGS.ENERGY_CONSUMPTION_ENTER_DEVICE),
+
+          }
+        },
+        [STATES.ENERGY_CONSUMPTION_ENTER_DEVICE]: {
+          action: () => {
+            console.error("能耗监控_进入设备action");
+            this.normalMode()
+            this.energyConsumptionEnterDevice()
+          },
+          trans: {
+            [STATES.ENERGY_CONSUMPTION]: this.createTransitionChecker(TRANSITION_FLAGS.ENTRANCE),
+            [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
+          }
+        },
+        [STATES.TEMPERATURE]: {
+          action: () => {
+            console.error("温度监控action");
+            this.normalMode()
+            this.currentBusiness = TRANSITION_FLAGS.TEMPERATURE
+
+          },
+          trans: {
+            [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
+
+            [STATES.SERVER]: this.checkBusiness(TRANSITION_FLAGS.SERVER),
+            [STATES.GPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.GPU_MODEL),
+            [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(TRANSITION_FLAGS.NETWORK_ARCHITECTURE),
+            [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(TRANSITION_FLAGS.ENERGY_CONSUMPTION),
+
+            [STATES.TEMPERATURE_ENTER_DEVICE]: this.createTransitionChecker(TRANSITION_FLAGS.TEMPERATURE_ENTER_DEVICE),
+          }
+        },
+        [STATES.TEMPERATURE_ENTER_DEVICE]: {
+          action: () => {
+            console.error("温度监控_进入设备action");
+            this.normalMode()
+            this.temperatureEnterDevice()
+          },
+          trans: {
+            [STATES.TEMPERATURE]: this.createTransitionChecker(TRANSITION_FLAGS.ENTRANCE),
+            [STATES.TEMPERATURE_ENTER_DEVICE_SPLIT]: this.createTransitionChecker(TRANSITION_FLAGS.SPLIT_SCREEN),
+            [STATES.TEMPERATURE_ENTER_DEVICE_SINGLE]: this.createTransitionChecker(TRANSITION_FLAGS.SINGLE_SCREEN),
+
+          }
+        },
+        [STATES.TEMPERATURE_ENTER_DEVICE_SPLIT]: {
+          action: () => {
+            console.error("温度监控_进入分屏action");
+            this.temperatureEnterDeviceSplit()
+          },
+          trans: {
+            [STATES.TEMPERATURE]: this.createTransitionChecker(TRANSITION_FLAGS.ENTRANCE),
+            [STATES.TEMPERATURE_ENTER_DEVICE_SINGLE]: this.createTransitionChecker(TRANSITION_FLAGS.SINGLE_SCREEN),
+          }
+        },
+        [STATES.TEMPERATURE_ENTER_DEVICE_SINGLE]: {
+          action: () => {
+            console.error("温度监控_进入单屏action");
+            this.temperatureEnterDeviceSingle()
+          },
+          trans: {
+            [STATES.TEMPERATURE]: this.createTransitionChecker(TRANSITION_FLAGS.ENTRANCE),
+            [STATES.TEMPERATURE_ENTER_DEVICE_SPLIT]: this.createTransitionChecker(TRANSITION_FLAGS.SPLIT_SCREEN),
+          }
+        },
+
+
+
+
+
+
     };
   }
 
@@ -488,7 +603,7 @@ class StateMachine {
   }
 
   /**
-   * @description CPU模式执行方法
+   * @description GPU模式执行方法
    */
   cpuMode() {
     THINGX.SplitScreenTwoTools.postMessageToIframe({
@@ -497,10 +612,10 @@ class StateMachine {
     });
     THINGX.SplitScreenTwoTools.postMessageToIframe({
       type: "runScript",
-      data: `THINGX.Business.activate('${TRANSITION_FLAGS.CPU_MODEL}');`,
+      data: `THINGX.Business.activate('${TRANSITION_FLAGS.GPU_MODEL}');`,
     });
     THINGX.SplitScreenTwoTools.show();
-    this.currentBusiness = TRANSITION_FLAGS.CPU_MODEL;
+    this.currentBusiness = TRANSITION_FLAGS.GPU_MODEL;
   }
   /**
    * @description 网络架构
@@ -548,12 +663,52 @@ class StateMachine {
   }
 
   /**
+   * @description 温度监控_进入分屏
+   */
+  temperatureEnterDeviceSplit() {
+    THINGX.SplitScreenTools.changeShowType("half");
+    THINGX.SplitScreenTwoTools.hide();
+  }
+
+
+  /**
    * @description 服务器模式下，点击全屏时的操作
    */
   serverModeClickFullScreen() {
     THINGX.SplitScreenTools.changeShowType("full");
     window.serverBoxManager.destroy();
   }
+  /**
+   * @description 温度监控_进入单屏
+   */
+  temperatureEnterDeviceSingle() {
+    THINGX.SplitScreenTools.changeShowType("full");
+  }
+
+
+  /**
+   * @description 能耗监控_进入设备
+   */
+  energyConsumptionEnterDevice() {
+    THINGX.SplitScreenTools.updateServerCi({
+      _DBID_: uinv["选择能耗下的设备"]._DBID_,
+    });
+    THINGX.SplitScreenTwoTools.hide();
+    THINGX.SplitScreenTools.show();
+  }
+
+  /**
+   * @description 温度监控_进入设备
+   */
+  temperatureEnterDevice() {
+    THINGX.SplitScreenTools.updateServerCi({
+      _DBID_: uinv["选择温度云图下的设备"]._DBID_,
+    });
+    THINGX.SplitScreenTwoTools.hide();
+    THINGX.SplitScreenTools.show();
+  }
+
+
 }
 
 if (THING.App.current.level.current.name == "北电数智") {
