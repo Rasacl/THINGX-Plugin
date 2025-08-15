@@ -16,7 +16,11 @@ const STATES = {
   TEMPERATURE_ENTER_DEVICE_SPLIT: "温度云图进入分屏",
   TEMPERATURE_ENTER_DEVICE_SINGLE: "温度云图进入单屏",
   PARAMETERSTORAGE: "参数网&存储网",
+  PARAMETERSTORAGE_ENTER_DEVICE: "参数网进入设备",
+
   BUSINESSNETWORK: "业务网",
+  LIQUIDCOOLINGPIPELINE: "液冷管线",
+  LIQUIDCOOLINGPIPELINE_ENTER_DEVICE: "液冷管线进入设备",
   NORMAL_MODEL: ["物理空间模式", "机柜模式", "业务架构"],
 };
 
@@ -35,7 +39,11 @@ const TRANSITION_FLAGS = {
   ENERGY_CONSUMPTION_ENTER_DEVICE: "能耗进入设备",
   TEMPERATURE: "温度监控",
   PARAMETERSTORAGE: "参数网&存储网",
+  PARAMETERSTORAGE_ENTER_DEVICE: "参数网进入设备",
   BUSINESSNETWORK: "业务网",
+  LIQUIDCOOLINGPIPELINE: "液冷管线",
+  LIQUIDCOOLINGPIPELINE_ENTER_DEVICE: "液冷管线进入设备",
+
   TEMPERATURE_ENTER_DEVICE: "温度云图进入设备",
 
   NORMAL_MODEL: ["物理空间模式", "机柜模式", "业务架构"],
@@ -253,8 +261,59 @@ class StateMachine {
           [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
             TRANSITION_FLAGS.ENERGY_CONSUMPTION
           ),
+          [STATES.TEMPERATURE]: this.checkBusiness(
+            TRANSITION_FLAGS.TEMPERATURE
+          ),
+
+          [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
+            TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
+          ),
+
         },
       },
+      [STATES.LIQUIDCOOLINGPIPELINE]: {
+        action: () => {
+          console.error("液冷管线action");
+        },
+        trans: {
+          [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
+          [STATES.SERVER]: this.checkBusiness(TRANSITION_FLAGS.SERVER),
+          [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(
+            TRANSITION_FLAGS.NETWORK_ARCHITECTURE
+          ),
+          [STATES.GPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.GPU_MODEL),
+          [STATES.TEMPERATURE]: this.checkBusiness(
+            TRANSITION_FLAGS.TEMPERATURE
+          ),
+          [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
+            TRANSITION_FLAGS.ENERGY_CONSUMPTION
+          ),
+          [STATES.LIQUIDCOOLINGPIPELINE_ENTER_DEVICE]: this.createTransitionChecker(
+            TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE_ENTER_DEVICE
+          ),
+
+        },
+      },
+      [STATES.LIQUIDCOOLINGPIPELINE_ENTER_DEVICE]: {
+        action: () => {
+          console.error("液冷管线进入设备action");
+          this.normalMode();
+          this.liquidCoolingPipelineEnterDevice();
+
+        },
+        deaction: () => {
+          console.error("液冷管线离开设备deaction");
+          this.normalMode()
+        },
+
+        trans: {
+          [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
+            TRANSITION_FLAGS.ENTRANCE
+          ),
+        },
+      },
+
+
 
       // 服务器模式 - 监听返回入口、常规模式、服务器进入设备
       [STATES.SERVER]: {
@@ -280,6 +339,9 @@ class StateMachine {
           [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
             TRANSITION_FLAGS.ENERGY_CONSUMPTION
           ),
+           [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
+            TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
+          ),
 
           [STATES.SERVER_ENTER_DEVICE]: this.createTransitionChecker(
             TRANSITION_FLAGS.SERVER_ENTER_DEVICE
@@ -294,6 +356,11 @@ class StateMachine {
           // 保持当前业务模式不变
           this.serverModeClickDevice();
         },
+        deaction: () => {
+          console.error("服务器设备离开deaction");
+         window.mutexButtonManager.remove('服务器模式图层互斥');
+        },
+
         trans: {
           [STATES.SERVER_ENTER_DEVICE_SPLIT]: this.createTransitionChecker(
             TRANSITION_FLAGS.SPLIT_SCREEN
@@ -358,6 +425,9 @@ class StateMachine {
           [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
             TRANSITION_FLAGS.ENERGY_CONSUMPTION
           ),
+           [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
+            TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
+          ),
         },
       },
 
@@ -392,6 +462,9 @@ class StateMachine {
           [STATES.PARAMETERSTORAGE]: this.createTransitionChecker(
             TRANSITION_FLAGS.PARAMETERSTORAGE
           ),
+           [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
+            TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
+          ),
 
           [STATES.NETWORK_ARCHITECTURE_ENTER_DEVICE]:
             this.createTransitionChecker(
@@ -417,8 +490,29 @@ class StateMachine {
           [STATES.NETWORK_ARCHITECTURE]: this.createTransitionChecker(
             TRANSITION_FLAGS.BUSINESSNETWORK
           ),
+          [STATES.PARAMETERSTORAGE_ENTER_DEVICE]: this.createTransitionChecker(
+            TRANSITION_FLAGS.PARAMETERSTORAGE_ENTER_DEVICE
+          ),
         },
       },
+      [STATES.PARAMETERSTORAGE_ENTER_DEVICE]: {
+        action: () => {
+          console.error("参数网&存储网_进入设备action");
+          this.normalMode();
+          this.parameterStorageEnterDevice();
+        },
+        deaction: () => {
+          console.error("参数网&存储网_离开设备deaction");
+          this.normalMode();
+        },
+        trans: {
+          [STATES.PARAMETERSTORAGE]: this.createTransitionChecker(
+            TRANSITION_FLAGS.ENTRANCE
+          ),
+        },
+
+      },
+
 
       [STATES.NETWORK_ARCHITECTURE_ENTER_DEVICE]: {
         action: () => {
@@ -457,6 +551,9 @@ class StateMachine {
           [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(
             TRANSITION_FLAGS.NETWORK_ARCHITECTURE
           ),
+           [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
+            TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
+          ),
 
           [STATES.ENERGY_CONSUMPTION_ENTER_DEVICE]:
             this.createTransitionChecker(
@@ -493,6 +590,9 @@ class StateMachine {
           ),
           [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
             TRANSITION_FLAGS.ENERGY_CONSUMPTION
+          ),
+           [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
+            TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
           ),
 
           [STATES.TEMPERATURE_ENTER_DEVICE]: this.createTransitionChecker(
@@ -707,7 +807,32 @@ class StateMachine {
 
     THINGX.SplitScreenTwoTools.hide();
     THINGX.SplitScreenTools.show();
+    window.mutexButtonManager.add(['服务器算力', '服务器能耗', '服务器温度'], '服务器模式图层互斥');
+
   }
+  /**
+   * @description 液冷管线_进入设备
+   */
+  liquidCoolingPipelineEnterDevice() {
+   THINGX.SplitScreenTools.updateServerCi({
+      _DBID_: uinv["选择液冷管线下的设备"]._DBID_,
+    });
+
+    THINGX.SplitScreenTwoTools.hide();
+    THINGX.SplitScreenTools.show();
+  }
+
+  /**
+   * @description 参数网_进入设备
+   */
+  parameterStorageEnterDevice() {
+    THINGX.SplitScreenTools.updateServerCi({
+      _DBID_: uinv["选择参数网下的设备"]._DBID_,
+    });
+    THINGX.SplitScreenTwoTools.hide();
+    THINGX.SplitScreenTools.show();
+  }
+
 
   networkArchitectureEnterDevice() {
     window.localtionFunc.click(uinv["选择网络监控下的设备"]);
