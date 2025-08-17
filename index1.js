@@ -21,7 +21,9 @@ const STATES = {
   BUSINESSNETWORK: "业务网",
   LIQUIDCOOLINGPIPELINE: "液冷管线",
   LIQUIDCOOLINGPIPELINE_ENTER_DEVICE: "液冷管线进入设备",
-  NORMAL_MODEL: ["物理空间模式", "机柜模式", "业务架构"],
+  BUSINESSARCHITECTURE: "业务架构",
+  GPU_UTILIZATION: "GPU利用率",
+  NORMAL_MODEL: ["物理空间模式", "机柜模式"],
 };
 
 // 状态转换标志枚举
@@ -45,8 +47,9 @@ const TRANSITION_FLAGS = {
   LIQUIDCOOLINGPIPELINE_ENTER_DEVICE: "液冷管线进入设备",
 
   TEMPERATURE_ENTER_DEVICE: "温度云图进入设备",
-
-  NORMAL_MODEL: ["物理空间模式", "机柜模式", "业务架构"],
+  BUSINESSARCHITECTURE: "业务架构",
+  GPU_UTILIZATION: "GPU利用率",
+  NORMAL_MODEL: ["物理空间模式", "机柜模式"],
 };
 
 const instanceSymbol = Symbol("StateMachine");
@@ -247,8 +250,11 @@ class StateMachine {
       [STATES.NORMAL]: {
         action: () => {
           console.error("常规模式action - 顶级状态");
-          // 清空当前业务模式，因为回到了最顶级
-          this.normalMode();
+          if (this.currentBusiness) {
+            // 清空当前业务模式，因为回到了最顶级
+            this.normalMode();
+          }
+
           THINGX.SplitScreenTwoTools.pauseBusinessEvent();
           this.currentBusiness = null;
         },
@@ -264,16 +270,19 @@ class StateMachine {
           [STATES.TEMPERATURE]: this.checkBusiness(
             TRANSITION_FLAGS.TEMPERATURE
           ),
+          [STATES.BUSINESSARCHITECTURE]: this.checkBusiness(
+            TRANSITION_FLAGS.BUSINESSARCHITECTURE
+          ),
 
           [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
             TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
           ),
-
         },
       },
       [STATES.LIQUIDCOOLINGPIPELINE]: {
         action: () => {
           console.error("液冷管线action");
+          THINGX.SplitScreenTools.restoreScene();
         },
         trans: {
           [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
@@ -288,10 +297,13 @@ class StateMachine {
           [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
             TRANSITION_FLAGS.ENERGY_CONSUMPTION
           ),
-          [STATES.LIQUIDCOOLINGPIPELINE_ENTER_DEVICE]: this.createTransitionChecker(
-            TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE_ENTER_DEVICE
+          [STATES.BUSINESSARCHITECTURE]: this.checkBusiness(
+            TRANSITION_FLAGS.BUSINESSARCHITECTURE
           ),
-
+          [STATES.LIQUIDCOOLINGPIPELINE_ENTER_DEVICE]:
+            this.createTransitionChecker(
+              TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE_ENTER_DEVICE
+            ),
         },
       },
       [STATES.LIQUIDCOOLINGPIPELINE_ENTER_DEVICE]: {
@@ -299,11 +311,10 @@ class StateMachine {
           console.error("液冷管线进入设备action");
           this.normalMode();
           this.liquidCoolingPipelineEnterDevice();
-
         },
         deaction: () => {
           console.error("液冷管线离开设备deaction");
-          this.normalMode()
+          this.normalMode();
         },
 
         trans: {
@@ -313,8 +324,6 @@ class StateMachine {
         },
       },
 
-
-
       // 服务器模式 - 监听返回入口、常规模式、服务器进入设备
       [STATES.SERVER]: {
         action: () => {
@@ -323,6 +332,8 @@ class StateMachine {
           if (THINGX.Business.getActivatedName() !== TRANSITION_FLAGS.SERVER) {
             THINGX.Business.activate(TRANSITION_FLAGS.SERVER);
           }
+          THINGX.SplitScreenTools.restoreScene();
+          this.setBusinessDisabled();
           this.normalMode();
           this.serverMode();
         },
@@ -333,13 +344,16 @@ class StateMachine {
           [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(
             TRANSITION_FLAGS.NETWORK_ARCHITECTURE
           ),
+          [STATES.BUSINESSARCHITECTURE]: this.checkBusiness(
+            TRANSITION_FLAGS.BUSINESSARCHITECTURE
+          ),
           [STATES.TEMPERATURE]: this.checkBusiness(
             TRANSITION_FLAGS.TEMPERATURE
           ),
           [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
             TRANSITION_FLAGS.ENERGY_CONSUMPTION
           ),
-           [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
+          [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
             TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
           ),
 
@@ -354,11 +368,12 @@ class StateMachine {
         action: () => {
           console.error("服务器进入设备action");
           // 保持当前业务模式不变
+          this.setBusinessDisabled(["智慧园区", "网络监控", "业务架构"]);
           this.serverModeClickDevice();
         },
         deaction: () => {
           console.error("服务器设备离开deaction");
-         window.mutexButtonManager.remove('服务器模式图层互斥');
+          window.mutexButtonManager.remove("服务器模式图层互斥");
         },
 
         trans: {
@@ -422,10 +437,13 @@ class StateMachine {
           [STATES.TEMPERATURE]: this.checkBusiness(
             TRANSITION_FLAGS.TEMPERATURE
           ),
+          [STATES.BUSINESSARCHITECTURE]: this.checkBusiness(
+            TRANSITION_FLAGS.BUSINESSARCHITECTURE
+          ),
           [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
             TRANSITION_FLAGS.ENERGY_CONSUMPTION
           ),
-           [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
+          [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
             TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
           ),
         },
@@ -445,6 +463,7 @@ class StateMachine {
             THINGX.SplitScreenTwoTools.show();
             return;
           }
+          THINGX.SplitScreenTools.restoreScene();
           this.normalMode();
           this.networkArchitecture();
         },
@@ -456,13 +475,16 @@ class StateMachine {
           [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
             TRANSITION_FLAGS.ENERGY_CONSUMPTION
           ),
+          [STATES.BUSINESSARCHITECTURE]: this.checkBusiness(
+            TRANSITION_FLAGS.BUSINESSARCHITECTURE
+          ),
           [STATES.TEMPERATURE]: this.checkBusiness(
             TRANSITION_FLAGS.TEMPERATURE
           ),
           [STATES.PARAMETERSTORAGE]: this.createTransitionChecker(
             TRANSITION_FLAGS.PARAMETERSTORAGE
           ),
-           [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
+          [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
             TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
           ),
 
@@ -475,6 +497,7 @@ class StateMachine {
       [STATES.PARAMETERSTORAGE]: {
         action: () => {
           console.error("参数网&存储网action");
+          THINGX.SplitScreenTools.restoreScene();
           this.normalMode();
         },
         trans: {
@@ -486,6 +509,9 @@ class StateMachine {
           ),
           [STATES.TEMPERATURE]: this.checkBusiness(
             TRANSITION_FLAGS.TEMPERATURE
+          ),
+          [STATES.BUSINESSARCHITECTURE]: this.checkBusiness(
+            TRANSITION_FLAGS.BUSINESSARCHITECTURE
           ),
           [STATES.NETWORK_ARCHITECTURE]: this.createTransitionChecker(
             TRANSITION_FLAGS.BUSINESSNETWORK
@@ -501,18 +527,12 @@ class StateMachine {
           this.normalMode();
           this.parameterStorageEnterDevice();
         },
-        deaction: () => {
-          console.error("参数网&存储网_离开设备deaction");
-          this.normalMode();
-        },
         trans: {
           [STATES.PARAMETERSTORAGE]: this.createTransitionChecker(
             TRANSITION_FLAGS.ENTRANCE
           ),
         },
-
       },
-
 
       [STATES.NETWORK_ARCHITECTURE_ENTER_DEVICE]: {
         action: () => {
@@ -537,6 +557,7 @@ class StateMachine {
       [STATES.ENERGY_CONSUMPTION]: {
         action: () => {
           console.error("能耗监控action");
+          THINGX.SplitScreenTools.restoreScene();
           this.normalMode();
           this.currentBusiness = TRANSITION_FLAGS.ENERGY_CONSUMPTION;
         },
@@ -548,10 +569,13 @@ class StateMachine {
           [STATES.TEMPERATURE]: this.checkBusiness(
             TRANSITION_FLAGS.TEMPERATURE
           ),
+          [STATES.BUSINESSARCHITECTURE]: this.checkBusiness(
+            TRANSITION_FLAGS.BUSINESSARCHITECTURE
+          ),
           [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(
             TRANSITION_FLAGS.NETWORK_ARCHITECTURE
           ),
-           [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
+          [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
             TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
           ),
 
@@ -577,6 +601,7 @@ class StateMachine {
       [STATES.TEMPERATURE]: {
         action: () => {
           console.error("温度监控action");
+          THINGX.SplitScreenTools.restoreScene();
           this.normalMode();
           this.currentBusiness = TRANSITION_FLAGS.TEMPERATURE;
         },
@@ -591,7 +616,10 @@ class StateMachine {
           [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
             TRANSITION_FLAGS.ENERGY_CONSUMPTION
           ),
-           [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
+          [STATES.BUSINESSARCHITECTURE]: this.checkBusiness(
+            TRANSITION_FLAGS.BUSINESSARCHITECTURE
+          ),
+          [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
             TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
           ),
 
@@ -641,6 +669,61 @@ class StateMachine {
           ),
           [STATES.TEMPERATURE_ENTER_DEVICE_SPLIT]: this.createTransitionChecker(
             TRANSITION_FLAGS.SPLIT_SCREEN
+          ),
+        },
+      },
+      [STATES.BUSINESSARCHITECTURE]: {
+        action: () => {
+          console.error("业务架构action");
+          this.normalMode();
+          this.currentBusiness = TRANSITION_FLAGS.BUSINESSARCHITECTURE;
+        },
+        trans: {
+          [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
+
+          [STATES.SERVER]: this.checkBusiness(TRANSITION_FLAGS.SERVER),
+          [STATES.GPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.GPU_MODEL),
+          [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(
+            TRANSITION_FLAGS.NETWORK_ARCHITECTURE
+          ),
+          [STATES.TEMPERATURE]: this.checkBusiness(
+            TRANSITION_FLAGS.TEMPERATURE
+          ),
+          [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
+            TRANSITION_FLAGS.ENERGY_CONSUMPTION
+          ),
+          [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
+            TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
+          ),
+          [STATES.GPU_UTILIZATION]: this.createTransitionChecker(
+            TRANSITION_FLAGS.GPU_UTILIZATION
+          ),
+        },
+      },
+      [STATES.GPU_UTILIZATION]: {
+        action: () => {
+          console.error("GPU利用率action");
+          this.gpuUtilizationMode();
+        },
+        trans: {
+          [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
+
+          [STATES.SERVER]: this.checkBusiness(TRANSITION_FLAGS.SERVER),
+          [STATES.GPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.GPU_MODEL),
+          [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(
+            TRANSITION_FLAGS.NETWORK_ARCHITECTURE
+          ),
+          [STATES.TEMPERATURE]: this.checkBusiness(
+            TRANSITION_FLAGS.TEMPERATURE
+          ),
+          [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
+            TRANSITION_FLAGS.ENERGY_CONSUMPTION
+          ),
+          [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
+            TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
+          ),
+          [STATES.BUSINESSARCHITECTURE]: this.createTransitionChecker(
+            TRANSITION_FLAGS.ENTRANCE
           ),
         },
       },
@@ -746,9 +829,17 @@ class StateMachine {
   }
 
   /**
+   * @description 禁用业务按钮
+   */
+  setBusinessDisabled(param) {
+    window.setBusinessDisabled(param);
+  }
+
+  /**
    * @description 服务器模式执行方法
    */
   serverMode() {
+    THINGX.Layer.show();
     THINGX.SplitScreenTwoTools.postMessageToIframe({
       type: "setAttributes",
       data: ["LevelCurrent", THING.App.current.level.current.userData],
@@ -779,6 +870,22 @@ class StateMachine {
     this.currentBusiness = TRANSITION_FLAGS.GPU_MODEL;
   }
   /**
+   * @description GPU利用率
+   */
+
+  gpuUtilizationMode() {
+    THINGX.SplitScreenTwoTools.postMessageToIframe({
+      type: "setAttributes",
+      data: ["LevelCurrent", THING.App.current.level.current.userData],
+    });
+    THINGX.SplitScreenTwoTools.postMessageToIframe({
+      type: "runScript",
+      data: `THINGX.Business.activate('${TRANSITION_FLAGS.GPU_UTILIZATION}');`,
+    });
+    THINGX.SplitScreenTwoTools.show();
+  }
+
+  /**
    * @description 网络架构
    */
   networkArchitecture() {
@@ -807,14 +914,38 @@ class StateMachine {
 
     THINGX.SplitScreenTwoTools.hide();
     THINGX.SplitScreenTools.show();
-    window.mutexButtonManager.add(['服务器算力', '服务器能耗', '服务器温度'], '服务器模式图层互斥');
+    window.mutexButtonManager.add(
+      ["服务器算力", "服务器能耗", "服务器温度"],
+      "服务器模式图层互斥"
+    );
 
+    THINGX.Layer.hide();
+    const layer = THINGX.Layer.getActivated();
+    let activeLayer;
+
+    if (layer && layer.length > 0) {
+      const layerIds = layer.map((item) => item.id);
+
+      // 按优先级顺序检查：温度 > 能耗 > 算力
+      if (layerIds.includes("服务器温度")) {
+        activeLayer = "温度";
+      } else if (layerIds.includes("服务器能耗")) {
+        activeLayer = "能耗监控";
+      } else if (layerIds.includes("服务器算力")) {
+        activeLayer = "算力监控";
+      }
+    }
+    // 测试——发送消息打开算力监控
+    setTimeout(() => {
+      console.error(`发送消息打开${activeLayer}`);
+      THINGX.SplitScreenTools.THINGX.Layer.activate(activeLayer);
+    }, 1000);
   }
   /**
    * @description 液冷管线_进入设备
    */
   liquidCoolingPipelineEnterDevice() {
-   THINGX.SplitScreenTools.updateServerCi({
+    THINGX.SplitScreenTools.updateServerCi({
       _DBID_: uinv["选择液冷管线下的设备"]._DBID_,
     });
 
@@ -832,7 +963,6 @@ class StateMachine {
     THINGX.SplitScreenTwoTools.hide();
     THINGX.SplitScreenTools.show();
   }
-
 
   networkArchitectureEnterDevice() {
     window.localtionFunc.click(uinv["选择网络监控下的设备"]);
