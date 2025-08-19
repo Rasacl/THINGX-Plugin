@@ -11,6 +11,9 @@ const STATES = {
   GPU_MODEL: "GPU模式",
   ENERGY_CONSUMPTION: "能耗监控",
   ENERGY_CONSUMPTION_ENTER_DEVICE: "能耗进入设备",
+  ENERGY_CONSUMPTION_ENTER_SPLIT: "能耗进入分屏",
+  ENERGY_CONSUMPTION_ENTER_SINGLE: "能耗进入单屏",
+
   TEMPERATURE: "温度监控",
   TEMPERATURE_ENTER_DEVICE: "温度云图进入设备",
   TEMPERATURE_ENTER_DEVICE_SPLIT: "温度云图进入分屏",
@@ -337,6 +340,8 @@ class StateMachine {
             THINGX.Business.activate(TRANSITION_FLAGS.SERVER);
           }
           THINGX.SplitScreenTools.restoreScene();
+          
+          window.serverBoxManager.destroy();
           window.resetMainScebeButton(["GPU", "服务器", "机柜", "物理空间"]);
           this.setBusinessDisabled();
           this.normalMode();
@@ -404,7 +409,7 @@ class StateMachine {
       [STATES.SERVER_ENTER_DEVICE_SINGLE]: {
         action: () => {
           console.error("服务器全屏action");
-          this.serverModeClickFullScreen();
+         this.handleSingleScreen();
         },
         trans: {
           [STATES.SERVER_ENTER_DEVICE_SPLIT]: this.createTransitionChecker(
@@ -420,7 +425,7 @@ class StateMachine {
       [STATES.SERVER_ENTER_DEVICE_SPLIT]: {
         action: () => {
           console.error("服务器分屏action");
-          this.serverModeClickSplitScreen();
+         this.handleSplitScreen(uinv["选择服务器模式下的设备"]);
         },
         trans: {
           [STATES.SERVER_ENTER_DEVICE_SINGLE]: this.createTransitionChecker(
@@ -579,6 +584,7 @@ class StateMachine {
           console.error("能耗监控action");
           THINGX.SplitScreenTools.restoreScene();
           this.normalMode();
+          window.serverBoxManager.destroy();
           this.setBusinessDisabled();
           this.currentBusiness = TRANSITION_FLAGS.ENERGY_CONSUMPTION;
         },
@@ -617,15 +623,54 @@ class StateMachine {
           [STATES.ENERGY_CONSUMPTION]: this.createTransitionChecker(
             TRANSITION_FLAGS.ENTRANCE
           ),
+          [STATES.ENERGY_CONSUMPTION_ENTER_SPLIT]: this.createTransitionChecker(
+            TRANSITION_FLAGS.SPLIT_SCREEN
+          ),
+          [STATES.ENERGY_CONSUMPTION_ENTER_SINGLE]: this.createTransitionChecker(
+            TRANSITION_FLAGS.SINGLE_SCREEN
+          ),
           // [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
         },
       },
+      [STATES.ENERGY_CONSUMPTION_ENTER_SPLIT]: {
+        action: () => {
+          console.error("能耗监控_进入分屏action");
+          this.handleSplitScreen(uinv["选择能耗下的设备"]);
+        },
+        trans: {
+          [STATES.ENERGY_CONSUMPTION]: this.createTransitionChecker(
+            TRANSITION_FLAGS.ENTRANCE
+          ),
+          [STATES.ENERGY_CONSUMPTION_ENTER_SINGLE]: this.createTransitionChecker(
+            TRANSITION_FLAGS.SINGLE_SCREEN
+          ),
+        },
+      },
+      [STATES.ENERGY_CONSUMPTION_ENTER_SINGLE]: {
+        action: () => {
+          console.error("能耗监控_进入单屏action");
+          this.handleSingleScreen();
+        },
+        trans: {
+          [STATES.ENERGY_CONSUMPTION]: this.createTransitionChecker(
+            TRANSITION_FLAGS.ENTRANCE
+          ),
+          [STATES.ENERGY_CONSUMPTION_ENTER_SPLIT]: this.createTransitionChecker(
+            TRANSITION_FLAGS.SPLIT_SCREEN
+          ),
+
+        },
+      },
+
+
       [STATES.TEMPERATURE]: {
         action: () => {
           console.error("温度监控action");
           THINGX.SplitScreenTools.restoreScene();
           this.normalMode();
           this.setBusinessDisabled();
+          
+          window.serverBoxManager.destroy();
           this.currentBusiness = TRANSITION_FLAGS.TEMPERATURE;
         },
         trans: {
@@ -672,7 +717,7 @@ class StateMachine {
       [STATES.TEMPERATURE_ENTER_DEVICE_SPLIT]: {
         action: () => {
           console.error("温度监控_进入分屏action");
-          this.temperatureEnterDeviceSplit();
+         this.handleSplitScreen(uinv["选择温度云图下的设备"]);
         },
         trans: {
           [STATES.TEMPERATURE]: this.createTransitionChecker(
@@ -685,7 +730,7 @@ class StateMachine {
       [STATES.TEMPERATURE_ENTER_DEVICE_SINGLE]: {
         action: () => {
           console.error("温度监控_进入单屏action");
-          this.temperatureEnterDeviceSingle();
+          this.handleSingleScreen();
         },
         trans: {
           [STATES.TEMPERATURE]: this.createTransitionChecker(
@@ -700,14 +745,17 @@ class StateMachine {
         action: () => {
           console.error("业务架构action");
           this.normalMode();
+          THINGX.SplitScreenTwoTools.show();
           THINGX.SplitScreenTwoTools.postMessageToIframe({
             type: "runScript",
             data: `THINGX.Business.activate('${TRANSITION_FLAGS.BUSINESSARCHITECTURE}');`,
           });
           this.currentBusiness = TRANSITION_FLAGS.BUSINESSARCHITECTURE;
-          setTimeout(() => {
-            window.uinv.nextStates_flag = TRANSITION_FLAGS.BUSINESSOVERVIEW;
-          }, 1000);
+          THINGX.SplitScreenTwoTools.THINGX.Layer.show();
+          THINGX.Layer.hide()
+          // setTimeout(() => {
+          //   window.uinv.nextStates_flag = TRANSITION_FLAGS.BUSINESSOVERVIEW;
+          // }, 1000);
         },
         trans: {
           [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
@@ -726,110 +774,110 @@ class StateMachine {
           [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
             TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
           ),
-          [STATES.GPU_UTILIZATION]: this.createTransitionChecker(
-            TRANSITION_FLAGS.GPU_UTILIZATION
-          ),
-          [STATES.BUSINESSOVERVIEW]: this.createTransitionChecker(
-            TRANSITION_FLAGS.BUSINESSOVERVIEW
-          ),
-          [STATES.TASKSCHEDULING]: this.createTransitionChecker(
-            TRANSITION_FLAGS.TASKSCHEDULING
-          ),
+          // [STATES.GPU_UTILIZATION]: this.createTransitionChecker(
+          //   TRANSITION_FLAGS.GPU_UTILIZATION
+          // ),
+          // [STATES.BUSINESSOVERVIEW]: this.createTransitionChecker(
+          //   TRANSITION_FLAGS.BUSINESSOVERVIEW
+          // ),
+          // [STATES.TASKSCHEDULING]: this.createTransitionChecker(
+          //   TRANSITION_FLAGS.TASKSCHEDULING
+          // ),
         },
       },
-      [STATES.GPU_UTILIZATION]: {
-        action: () => {
-          console.error("GPU利用率action");
-          this.gpuUtilizationMode();
-        },
-        trans: {
-          [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
+      // [STATES.GPU_UTILIZATION]: {
+      //   action: () => {
+      //     console.error("GPU利用率action");
+      //     this.gpuUtilizationMode();
+      //   },
+      //   trans: {
+      //     [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
 
-          [STATES.SERVER]: this.checkBusiness(TRANSITION_FLAGS.SERVER),
-          [STATES.GPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.GPU_MODEL),
-          [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(
-            TRANSITION_FLAGS.NETWORK_ARCHITECTURE
-          ),
-          [STATES.TEMPERATURE]: this.checkBusiness(
-            TRANSITION_FLAGS.TEMPERATURE
-          ),
-          [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
-            TRANSITION_FLAGS.ENERGY_CONSUMPTION
-          ),
-          [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
-            TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
-          ),
+      //     [STATES.SERVER]: this.checkBusiness(TRANSITION_FLAGS.SERVER),
+      //     [STATES.GPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.GPU_MODEL),
+      //     [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(
+      //       TRANSITION_FLAGS.NETWORK_ARCHITECTURE
+      //     ),
+      //     [STATES.TEMPERATURE]: this.checkBusiness(
+      //       TRANSITION_FLAGS.TEMPERATURE
+      //     ),
+      //     [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
+      //       TRANSITION_FLAGS.ENERGY_CONSUMPTION
+      //     ),
+      //     [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
+      //       TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
+      //     ),
 
-          [STATES.BUSINESSOVERVIEW]: this.createTransitionChecker(
-            TRANSITION_FLAGS.BUSINESSOVERVIEW
-          ),
-          [STATES.TASKSCHEDULING]: this.createTransitionChecker(
-            TRANSITION_FLAGS.TASKSCHEDULING
-          ),
-        },
-      },
-      [STATES.BUSINESSOVERVIEW]: {
-        action: () => {
-          console.error("业务总览action");
-          this.businessOverviewMode();
-        },
-        trans: {
-          [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
+      //     [STATES.BUSINESSOVERVIEW]: this.createTransitionChecker(
+      //       TRANSITION_FLAGS.BUSINESSOVERVIEW
+      //     ),
+      //     [STATES.TASKSCHEDULING]: this.createTransitionChecker(
+      //       TRANSITION_FLAGS.TASKSCHEDULING
+      //     ),
+      //   },
+      // },
+      // [STATES.BUSINESSOVERVIEW]: {
+      //   action: () => {
+      //     console.error("业务总览action");
+      //     this.businessOverviewMode();
+      //   },
+      //   trans: {
+      //     [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
 
-          [STATES.SERVER]: this.checkBusiness(TRANSITION_FLAGS.SERVER),
-          [STATES.GPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.GPU_MODEL),
-          [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(
-            TRANSITION_FLAGS.NETWORK_ARCHITECTURE
-          ),
-          [STATES.TEMPERATURE]: this.checkBusiness(
-            TRANSITION_FLAGS.TEMPERATURE
-          ),
-          [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
-            TRANSITION_FLAGS.ENERGY_CONSUMPTION
-          ),
-          [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
-            TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
-          ),
+      //     [STATES.SERVER]: this.checkBusiness(TRANSITION_FLAGS.SERVER),
+      //     [STATES.GPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.GPU_MODEL),
+      //     [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(
+      //       TRANSITION_FLAGS.NETWORK_ARCHITECTURE
+      //     ),
+      //     [STATES.TEMPERATURE]: this.checkBusiness(
+      //       TRANSITION_FLAGS.TEMPERATURE
+      //     ),
+      //     [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
+      //       TRANSITION_FLAGS.ENERGY_CONSUMPTION
+      //     ),
+      //     [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
+      //       TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
+      //     ),
 
-          [STATES.GPU_UTILIZATION]: this.createTransitionChecker(
-            TRANSITION_FLAGS.GPU_UTILIZATION
-          ),
-          [STATES.TASKSCHEDULING]: this.createTransitionChecker(
-            TRANSITION_FLAGS.TASKSCHEDULING
-          ),
-        },
-      },
-      [STATES.TASKSCHEDULING]: {
-        action: () => {
-          console.error("任务调度action");
-          this.taskSchedulingMode();
-        },
-        trans: {
-          [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
+      //     [STATES.GPU_UTILIZATION]: this.createTransitionChecker(
+      //       TRANSITION_FLAGS.GPU_UTILIZATION
+      //     ),
+      //     [STATES.TASKSCHEDULING]: this.createTransitionChecker(
+      //       TRANSITION_FLAGS.TASKSCHEDULING
+      //     ),
+      //   },
+      // },
+      // [STATES.TASKSCHEDULING]: {
+      //   action: () => {
+      //     console.error("任务调度action");
+      //     this.taskSchedulingMode();
+      //   },
+      //   trans: {
+      //     [STATES.NORMAL]: this.checkNormalMode(TRANSITION_FLAGS.NORMAL_MODEL),
 
-          [STATES.SERVER]: this.checkBusiness(TRANSITION_FLAGS.SERVER),
-          [STATES.GPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.GPU_MODEL),
-          [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(
-            TRANSITION_FLAGS.NETWORK_ARCHITECTURE
-          ),
-          [STATES.TEMPERATURE]: this.checkBusiness(
-            TRANSITION_FLAGS.TEMPERATURE
-          ),
-          [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
-            TRANSITION_FLAGS.ENERGY_CONSUMPTION
-          ),
-          [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
-            TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
-          ),
+      //     [STATES.SERVER]: this.checkBusiness(TRANSITION_FLAGS.SERVER),
+      //     [STATES.GPU_MODEL]: this.checkBusiness(TRANSITION_FLAGS.GPU_MODEL),
+      //     [STATES.NETWORK_ARCHITECTURE]: this.checkBusiness(
+      //       TRANSITION_FLAGS.NETWORK_ARCHITECTURE
+      //     ),
+      //     [STATES.TEMPERATURE]: this.checkBusiness(
+      //       TRANSITION_FLAGS.TEMPERATURE
+      //     ),
+      //     [STATES.ENERGY_CONSUMPTION]: this.checkBusiness(
+      //       TRANSITION_FLAGS.ENERGY_CONSUMPTION
+      //     ),
+      //     [STATES.LIQUIDCOOLINGPIPELINE]: this.createTransitionChecker(
+      //       TRANSITION_FLAGS.LIQUIDCOOLINGPIPELINE
+      //     ),
 
-          [STATES.GPU_UTILIZATION]: this.createTransitionChecker(
-            TRANSITION_FLAGS.GPU_UTILIZATION
-          ),
-          [STATES.BUSINESSOVERVIEW]: this.createTransitionChecker(
-            TRANSITION_FLAGS.BUSINESSOVERVIEW
-          ),
-        },
-      },
+      //     [STATES.GPU_UTILIZATION]: this.createTransitionChecker(
+      //       TRANSITION_FLAGS.GPU_UTILIZATION
+      //     ),
+      //     [STATES.BUSINESSOVERVIEW]: this.createTransitionChecker(
+      //       TRANSITION_FLAGS.BUSINESSOVERVIEW
+      //     ),
+      //   },
+      // },
     };
   }
 
@@ -888,29 +936,29 @@ class StateMachine {
   /**
    * @description 递归向上切换层级，直到到达Floor层
    */
-  changeToFloorRecursively() {
-    let currentLevel = THING.App.current.level.current;
+  // changeToFloorRecursively() {
+  //   let currentLevel = THING.App.current.level.current;
 
-    // 循环向上查找直到找到Floor类型或到达顶层
-    while (currentLevel && currentLevel.type !== "Floor") {
-      const parentLevel = currentLevel.parent;
+  //   // 循环向上查找直到找到Floor类型或到达顶层
+  //   while (currentLevel && currentLevel.type !== "Floor") {
+  //     const parentLevel = currentLevel.parent;
 
-      if (!parentLevel) {
-        console.error("已经到达顶层，但未找到Floor类型");
-        break;
-      }
+  //     if (!parentLevel) {
+  //       console.error("已经到达顶层，但未找到Floor类型");
+  //       break;
+  //     }
 
-      // 切换到父级层级
-      THING.App.current.level.change(parentLevel);
-      console.error(`切换到层级: ${parentLevel.name || parentLevel.type}`);
+  //     // 切换到父级层级
+  //     THING.App.current.level.change(parentLevel);
+  //     console.error(`切换到层级: ${parentLevel.name || parentLevel.type}`);
 
-      currentLevel = parentLevel;
-    }
+  //     currentLevel = parentLevel;
+  //   }
 
-    if (currentLevel && currentLevel.type === "Floor") {
-      console.error("成功到达Floor层级");
-    }
-  }
+  //   if (currentLevel && currentLevel.type === "Floor") {
+  //     console.error("成功到达Floor层级");
+  //   }
+  // }
 
   /**
    * @description 创建状态转换检查函数
@@ -956,6 +1004,8 @@ class StateMachine {
   normalMode() {
     THINGX.SplitScreenTools.hide();
     THINGX.SplitScreenTwoTools.hide();
+    THINGX.SplitScreenTwoTools.THINGX.Layer.hide();
+    THINGX.Layer.show()
   }
 
   /**
@@ -1016,7 +1066,7 @@ class StateMachine {
     THINGX.SplitScreenTwoTools.THINGX.Layer.activate(
       TRANSITION_FLAGS.BUSINESSOVERVIEW
     );
-    THINGX.SplitScreenTwoTools.show();
+
   }
   /**
    * @description 任务调度
@@ -1032,11 +1082,15 @@ class StateMachine {
    * @description 网络架构
    */
   networkArchitecture() {
+    THINGX.SplitScreenTwoTools.show();
     THINGX.SplitScreenTwoTools.postMessageToIframe({
       type: "runScript",
       data: `THINGX.Business.activate('${TRANSITION_FLAGS.NETWORK_ARCHITECTURE}');`,
     });
-    THINGX.SplitScreenTwoTools.show();
+    // THINGX.SplitScreenTwoTools.postMessageToIframe({
+    //   type: "runScript",
+    //   data: `THING.App.current.queryByName('网络架构01')[0].visible = true;`,
+    // });
     this.currentBusiness = TRANSITION_FLAGS.NETWORK_ARCHITECTURE;
   }
 
@@ -1110,36 +1164,22 @@ class StateMachine {
   networkArchitectureEnterDevice() {
     window.localtionFunc.click(uinv["选择网络监控下的设备"]);
   }
-
-  /**
-   * @description 服务器模式下，点击分屏时的操作
+    /**
+   * @description 通用分屏处理方法
+   * @param {Object} deviceSelection 设备选择参数
    */
-  serverModeClickSplitScreen() {
+  handleSplitScreen(deviceSelection) {
     THINGX.SplitScreenTools.changeShowType("half");
     THINGX.SplitScreenTwoTools.hide(true);
-    this.createLocationBox(uinv["选择服务器模式下的设备"]);
+    this.createLocationBox(deviceSelection);
   }
 
   /**
-   * @description 温度监控_进入分屏
+   * @description 通用单屏处理方法
    */
-  temperatureEnterDeviceSplit() {
-    THINGX.SplitScreenTools.changeShowType("half");
-    THINGX.SplitScreenTwoTools.hide(true);
-  }
-
-  /**
-   * @description 服务器模式下，点击全屏时的操作
-   */
-  serverModeClickFullScreen() {
+  handleSingleScreen() {
     THINGX.SplitScreenTools.changeShowType("full");
     window.serverBoxManager.destroy();
-  }
-  /**
-   * @description 温度监控_进入单屏
-   */
-  temperatureEnterDeviceSingle() {
-    THINGX.SplitScreenTools.changeShowType("full");
   }
 
   /**
